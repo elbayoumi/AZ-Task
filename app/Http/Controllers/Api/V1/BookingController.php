@@ -3,43 +3,32 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\BookingRequest;
 use App\Models\Booking;
 use App\Models\Room;
-use Illuminate\Http\Request;
+use App\Traits\ApiResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
 class BookingController extends Controller
 {
-    /**
-     * Display a listing of the bookings.
-     */
+    use ApiResponse;
+
     public function index()
     {
-        $bookings = Booking::with(['room', 'user'])->where('user_id', Auth::id())->get();
-        return response()->json($bookings);
+        $bookings = Booking::with(['room', 'user'])
+            ->where('user_id', Auth::id())
+            ->get();
+
+        return $this->successResponse($bookings, 'Bookings retrieved successfully');
     }
 
-    /**
-     * Store a newly created booking in storage.
-     */
-    public function store(Request $request)
+    public function store(BookingRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'room_id' => 'required|exists:rooms,id',
-            'start_date' => 'required|date|after_or_equal:today',
-            'end_date' => 'required|date|after:start_date',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
         $room = Room::findOrFail($request->room_id);
 
         if ($room->status !== 'available') {
-            return response()->json(['message' => 'Room is not available'], 400);
+            return $this->errorResponse('Room is not available', null, 400);
         }
 
         $days = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date));
@@ -53,41 +42,26 @@ class BookingController extends Controller
             'total_price' => $total_price,
         ]);
 
-        return response()->json($booking, 201);
+        return $this->successResponse($booking, 'Booking created successfully', 201);
     }
 
-    /**
-     * Display the specified booking.
-     */
     public function show(string $id)
     {
         $booking = Booking::with(['room', 'user'])->findOrFail($id);
 
         if ($booking->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return $this->errorResponse('Unauthorized', null, 403);
         }
 
-        return response()->json($booking);
+        return $this->successResponse($booking, 'Booking retrieved successfully');
     }
 
-    /**
-     * Update the specified booking in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(BookingRequest $request, string $id)
     {
         $booking = Booking::findOrFail($id);
 
         if ($booking->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'start_date' => 'required|date|after_or_equal:today',
-            'end_date' => 'required|date|after:start_date',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return $this->errorResponse('Unauthorized', null, 403);
         }
 
         $days = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date));
@@ -99,22 +73,19 @@ class BookingController extends Controller
             'total_price' => $total_price,
         ]);
 
-        return response()->json($booking);
+        return $this->successResponse($booking, 'Booking updated successfully');
     }
 
-    /**
-     * Remove the specified booking from storage.
-     */
     public function destroy(string $id)
     {
         $booking = Booking::findOrFail($id);
 
         if ($booking->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return $this->errorResponse('Unauthorized', null, 403);
         }
 
         $booking->delete();
 
-        return response()->json(['message' => 'Booking deleted successfully']);
+        return $this->successResponse(null, 'Booking deleted successfully');
     }
 }
