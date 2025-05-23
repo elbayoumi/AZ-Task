@@ -4,51 +4,51 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\RegisterRequest;
+use App\Http\Requests\Api\LoginRequest;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use App\Traits\ApiResponse;
 
 class AuthController extends Controller
 {
+    use ApiResponse;
+
     public function register(RegisterRequest $request)
     {
-
         $user = User::create($request->validated());
 
         $token = $user->createToken('api-token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'User registered successfully',
+        return $this->successResponse([
             'token' => $token,
-            'user' => $user
-        ], 201);
+            'user' => $user,
+        ], 'User registered successfully', 201);
     }
 
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'email' => 'required|string|email',
-            'password' => 'required|string',
-        ]);
-
         $user = User::where('email', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
+        if (! $user) {
+            return $this->errorResponse('No account found for this email.', null, 404);
+        }
+
+        if (! Hash::check($request->password, $user->password)) {
+            return $this->errorResponse('Incorrect password.', null, 422);
         }
 
         $token = $user->createToken('api-token')->plainTextToken;
 
-        return response()->json(['token' => $token]);
+        return $this->successResponse([
+            'token' => $token,
+            'user' => $user,
+        ], 'Logged in successfully');
     }
 
-    public function logout(Request $request)
+    public function logout()
     {
-        $request->user()->currentAccessToken()->delete();
+        auth()->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Logged out']);
+        return $this->successResponse(null, 'Logged out successfully');
     }
 }
