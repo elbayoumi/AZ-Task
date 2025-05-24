@@ -14,6 +14,9 @@ class BookingController extends Controller
 {
     use ApiResponse;
 
+    /**
+     * Display a list of bookings for the authenticated user.
+     */
     public function index()
     {
         $bookings = Booking::with(['room', 'user'])
@@ -23,6 +26,9 @@ class BookingController extends Controller
         return $this->successResponse($bookings, 'Bookings retrieved successfully');
     }
 
+    /**
+     * Create a new booking for a room, checking availability.
+     */
     public function store(BookingRequest $request)
     {
         $room = Room::findOrFail($request->room_id);
@@ -31,9 +37,27 @@ class BookingController extends Controller
             return $this->errorResponse('Room is not available', null, 400);
         }
 
+        // Check if the room is available in the requested period (no overlap)
+        $hasOverlap = Booking::where('room_id', $room->id)
+            ->where(function ($query) use ($request) {
+                $query->whereBetween('start_date', [$request->start_date, $request->end_date])
+                    ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
+                    ->orWhere(function ($q) use ($request) {
+                        $q->where('start_date', '<', $request->start_date)
+                          ->where('end_date', '>', $request->end_date);
+                    });
+            })
+            ->exists();
+
+        if ($hasOverlap) {
+            return $this->errorResponse('Room is already booked in the requested period.', null, 422);
+        }
+
+        // Calculate total price
         $days = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date));
         $total_price = $days * $room->price_per_night;
 
+        // Create the booking
         $booking = Booking::create([
             'user_id' => Auth::id(),
             'room_id' => $room->id,
@@ -45,6 +69,9 @@ class BookingController extends Controller
         return $this->successResponse($booking, 'Booking created successfully', 201);
     }
 
+    /**
+     * Show the details of a specific booking.
+     */
     public function show(string $id)
     {
         $booking = Booking::with(['room', 'user'])->findOrFail($id);
@@ -56,6 +83,9 @@ class BookingController extends Controller
         return $this->successResponse($booking, 'Booking retrieved successfully');
     }
 
+    /**
+     * Update an existing booking for the authenticated user.
+     */
     public function update(BookingRequest $request, string $id)
     {
         $booking = Booking::findOrFail($id);
@@ -64,6 +94,24 @@ class BookingController extends Controller
             return $this->errorResponse('Unauthorized', null, 403);
         }
 
+        // Check if the new dates overlap with other bookings for the same room
+        $hasOverlap = Booking::where('room_id', $booking->room_id)
+            ->where('id', '!=', $booking->id)
+            ->where(function ($query) use ($request) {
+                $query->whereBetween('start_date', [$request->start_date, $request->end_date])
+                    ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
+                    ->orWhere(function ($q) use ($request) {
+                        $q->where('start_date', '<', $request->start_date)
+                          ->where('end_date', '>', $request->end_date);
+                    });
+            })
+            ->exists();
+
+        if ($hasOverlap) {
+            return $this->errorResponse('Room is already booked in the requested period.', null, 422);
+        }
+
+        // Calculate the total price based on new dates
         $days = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date));
         $total_price = $days * $booking->room->price_per_night;
 
@@ -76,6 +124,9 @@ class BookingController extends Controller
         return $this->successResponse($booking, 'Booking updated successfully');
     }
 
+    /**
+     * Delete a booking for the authenticated user.
+     */
     public function destroy(string $id)
     {
         $booking = Booking::findOrFail($id);

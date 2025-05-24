@@ -20,6 +20,7 @@ Route::prefix('v1')->middleware('accepts.json')->group(function () {
 
         // Rooms (admins only, handled via policies in RoomController)
         Route::apiResource('rooms', RoomController::class);
+        Route::get('rooms/available', [RoomController::class, 'available']);
 
         // Users (admins only, handled via policies in UserController)
         Route::apiResource('users', UserController::class)->only(['index', 'show']);
