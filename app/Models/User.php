@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
+use App\RoleEnum;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -28,6 +29,10 @@ class User extends Authenticatable
     ];
     public $incrementing = false;
     protected $keyType = 'string';
+
+    protected $casts = [
+        'role' => RoleEnum::class,
+    ];
 
     /**
      * The attributes that should be hidden for serialization.

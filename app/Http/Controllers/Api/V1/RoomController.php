@@ -3,83 +3,84 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\RoomRequest;
 use App\Models\Room;
 use App\Traits\ApiResponse;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class RoomController extends Controller
 {
-    use ApiResponse;
+    use ApiResponse ,AuthorizesRequests;
 
-    public function index()
+    public function index(Request $request)
     {
-        $rooms = Room::all();
-        return $this->successResponse($rooms, 'Rooms retrieved successfully');
+        try {
+            $perPage = $request->get('per_page', 10); // Default 10 items per page
+
+            $rooms = Room::paginate($perPage);
+
+            return $this->successResponse($rooms, 'Rooms retrieved successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to retrieve rooms', $e->getMessage(), 500);
+        }
     }
 
-    public function store(Request $request)
+    public function store(RoomRequest $request)
     {
-        if (Auth::user()->role !== 'admin') {
-            return $this->errorResponse('Unauthorized - Admins only', null, 403);
+        try {
+            $this->authorize('create', Room::class);
+
+            $validator = $request->validated();
+
+
+            $room = Room::create($validator);
+
+            return $this->successResponse($room, 'Room created successfully', 201);
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to create room', $e->getMessage(), 500);
         }
-
-        $validator = Validator::make($request->all(), [
-            'number' => 'required|string|unique:rooms',
-            'type' => 'required|in:single,double,suite',
-            'price_per_night' => 'required|numeric|min:0',
-            'status' => 'required|in:available,unavailable',
-        ]);
-
-        if ($validator->fails()) {
-            return $this->errorResponse('Validation failed', $validator->errors());
-        }
-
-        $room = Room::create($request->all());
-
-        return $this->successResponse($room, 'Room created successfully', 201);
     }
 
     public function show(string $id)
     {
-        $room = Room::findOrFail($id);
-        return $this->successResponse($room, 'Room details retrieved');
+        try {
+            $room = Room::findOrFail($id);
+            return $this->successResponse($room, 'Room details retrieved');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to retrieve room', $e->getMessage(), 500);
+        }
     }
 
-    public function update(Request $request, string $id)
+    public function update(RoomRequest $request, string $id)
     {
-        if (Auth::user()->role !== 'admin') {
-            return $this->errorResponse('Unauthorized - Admins only', null, 403);
+        try {
+            $room = Room::findOrFail($id);
+            $this->authorize('update', $room);
+
+            $validator = $request->validated();
+
+
+            $room->update($validator);
+
+            return $this->successResponse($room, 'Room updated successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to update room', $e->getMessage(), 500);
         }
-
-        $room = Room::findOrFail($id);
-
-        $validator = Validator::make($request->all(), [
-            'number' => 'string|unique:rooms,number,' . $id,
-            'type' => 'in:single,double,suite',
-            'price_per_night' => 'numeric|min:0',
-            'status' => 'in:available,unavailable',
-        ]);
-
-        if ($validator->fails()) {
-            return $this->errorResponse('Validation failed', $validator->errors());
-        }
-
-        $room->update($request->all());
-
-        return $this->successResponse($room, 'Room updated successfully');
     }
 
     public function destroy(string $id)
     {
-        if (Auth::user()->role !== 'admin') {
-            return $this->errorResponse('Unauthorized - Admins only', null, 403);
+        try {
+            $room = Room::findOrFail($id);
+            $this->authorize('delete', $room);
+
+            $room->delete();
+
+            return $this->successResponse(null, 'Room deleted successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to delete room', $e->getMessage(), 500);
         }
-
-        $room = Room::findOrFail($id);
-        $room->delete();
-
-        return $this->successResponse(null, 'Room deleted successfully');
     }
 }
