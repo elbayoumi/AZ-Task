@@ -8,11 +8,11 @@ use App\Http\Controllers\Api\V1\UserController;
 
 Route::prefix('v1')->middleware('accepts.json')->group(function () {
     // Public endpoints
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/register', [AuthController::class, 'register'])->name('register');
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
 
     // Available rooms: accessible without authentication
-    Route::get('rooms/available', [RoomController::class, 'available']);
+    Route::get('rooms/available', [RoomController::class, 'available'])->name('rooms.available');
 
     // Protected APIs
     Route::middleware(['auth:sanctum', 'ensure.authenticated'])->group(function () {

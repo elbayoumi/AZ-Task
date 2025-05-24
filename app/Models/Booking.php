@@ -36,6 +36,23 @@ class Booking extends Model
     {
         return $this->belongsTo(Room::class);
     }
+    /**
+     * Scope to check if a booking overlaps with the given date range.
+     */
+
+    public function scopeOverlapInPeriod($query, $roomId, $startDate, $endDate, $excludeId = null)
+    {
+        return $query->where('room_id', $roomId)
+            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('start_date', [$startDate, $endDate])
+                    ->orWhereBetween('end_date', [$startDate, $endDate])
+                    ->orWhere(function ($q2) use ($startDate, $endDate) {
+                        $q2->where('start_date', '<', $startDate)
+                            ->where('end_date', '>', $endDate);
+                    });
+            });
+    }
 
     /**
      * Automatically calculate total_price before saving.

@@ -37,17 +37,12 @@ class BookingController extends Controller
             return $this->errorResponse('Room is not available', null, 400);
         }
 
-        // Check if the room is available in the requested period (no overlap)
-        $hasOverlap = Booking::where('room_id', $room->id)
-            ->where(function ($query) use ($request) {
-                $query->whereBetween('start_date', [$request->start_date, $request->end_date])
-                    ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
-                    ->orWhere(function ($q) use ($request) {
-                        $q->where('start_date', '<', $request->start_date)
-                          ->where('end_date', '>', $request->end_date);
-                    });
-            })
-            ->exists();
+        // Check if the room is available in the requested period
+        $hasOverlap = Booking::overlapInPeriod(
+            $room->id,
+            $request->start_date,
+            $request->end_date
+        )->exists();
 
         if ($hasOverlap) {
             return $this->errorResponse('Room is already booked in the requested period.', null, 422);
@@ -95,17 +90,12 @@ class BookingController extends Controller
         }
 
         // Check if the new dates overlap with other bookings for the same room
-        $hasOverlap = Booking::where('room_id', $booking->room_id)
-            ->where('id', '!=', $booking->id)
-            ->where(function ($query) use ($request) {
-                $query->whereBetween('start_date', [$request->start_date, $request->end_date])
-                    ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
-                    ->orWhere(function ($q) use ($request) {
-                        $q->where('start_date', '<', $request->start_date)
-                          ->where('end_date', '>', $request->end_date);
-                    });
-            })
-            ->exists();
+        $hasOverlap = Booking::overlapInPeriod(
+            $booking->room_id,
+            $request->start_date,
+            $request->end_date,
+            $booking->id // exclude current booking
+        )->exists();
 
         if ($hasOverlap) {
             return $this->errorResponse('Room is already booked in the requested period.', null, 422);
